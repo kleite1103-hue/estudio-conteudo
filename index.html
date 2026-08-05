@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estúdio de Conteúdo — Efeito Vendas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0d0f;--pan:#16161a;--pan2:#1d1e23;--line:#2a2b31;--orange:#ff4d1c;--ink:#eeeef2;--soft:#9698a2;--dim:#6b6d78}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'Poppins',sans-serif;-webkit-font-smoothing:antialiased;padding:16px;max-width:760px;margin:0 auto}
+h1{font-size:20px;font-weight:700;margin-bottom:2px}
+h1 b{color:var(--orange)}
+.sub{color:var(--soft);font-size:13px;margin-bottom:18px}
+.card{background:var(--pan);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+label{display:block;font-size:12px;color:var(--soft);margin-bottom:6px;font-weight:500}
+input,textarea,select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:11px 13px;color:var(--ink);font-family:'Poppins';font-size:14px}
+input:focus,textarea:focus{outline:none;border-color:var(--orange)}
+textarea{min-height:90px;resize:vertical;line-height:1.5}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1}
+button{background:var(--orange);color:#12100c;border:none;border-radius:10px;padding:12px 16px;font-family:'Poppins';font-weight:600;font-size:14px;cursor:pointer;transition:.15s}
+button:hover{filter:brightness(1.08)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+button.mic{background:var(--pan2);border:1px solid var(--line);color:var(--ink);flex:0 0 auto;width:52px;font-size:20px}
+button.mic.rec{background:#e0342f;color:#fff;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.6}}
+.fmt{display:flex;gap:8px}
+.fmt .opt{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 8px;text-align:center;cursor:pointer;font-size:13px;font-weight:500;transition:.15s}
+.fmt .opt.on{border-color:var(--orange);background:rgba(255,77,28,.12);color:var(--orange)}
+.fmt .opt small{display:block;color:var(--dim);font-size:10px;margin-top:3px;font-weight:400}
+.fmt .opt.on small{color:var(--orange)}
+.ideas{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.idea{background:var(--pan2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:13px;cursor:pointer;line-height:1.4}
+.idea:hover{border-color:var(--orange)}
+.idea b{color:var(--orange)}
+.status{font-size:12px;color:var(--soft);margin-top:10px;min-height:16px}
+.status.err{color:#ff5c5c}
+.preview{margin-top:14px}
+.slides{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
+.slidewrap{flex:0 0 auto;text-align:center}
+.slidewrap canvas{width:200px;border-radius:10px;border:1px solid var(--line);display:block}
+.slidewrap .dl{margin-top:6px;font-size:11px;padding:6px 10px}
+.settings-toggle{font-size:12px;color:var(--dim);cursor:pointer;text-decoration:underline;margin-bottom:10px;display:inline-block}
+.hidden{display:none}
+.hint{font-size:11px;color:var(--dim);margin-top:6px;line-height:1.4}
+a{color:var(--orange)}
+</style>
+</head>
+<body>
+<h1>Estúdio de Conteúdo <b>Efeito Vendas</b></h1>
+<div class="sub">Fala a ideia, escolhe o formato, e a IA escreve e desenha no teu estilo.</div>
+
+<span class="settings-toggle" onclick="document.getElementById('setts').classList.toggle('hidden')">⚙ configurar chave</span>
+<div class="card hidden" id="setts">
+  <label>Chave da API Anthropic (fica salva só no teu navegador)</label>
+  <input id="apiKey" type="password" placeholder="sk-ant-...">
+  <div style="height:10px"></div>
+  <label>Modelo</label>
+  <input id="model" placeholder="claude-sonnet-5">
+  <div class="hint">A chave nunca sai do teu aparelho. Pegue em console.anthropic.com. Cada geração e cada pesquisa consomem créditos da tua conta.</div>
+  <div style="height:10px"></div>
+  <button class="ghost" onclick="saveSetts()">Salvar</button>
+</div>
+
+<div class="card">
+  <label>Sua ideia (escreve ou fala)</label>
+  <div class="row" style="align-items:flex-start">
+    <textarea id="idea" placeholder="Ex: como calcular o CPM na Shopee, com a lógica de investi X e apareci pra Y mil pessoas..."></textarea>
+    <button class="mic" id="micBtn" title="Falar" onclick="toggleMic()">🎤</button>
+  </div>
+  <div style="height:12px"></div>
+  <button class="ghost" onclick="trazerIdeias()" id="ideasBtn">💡 Trazer ideias (pesquisa o que está acontecendo)</button>
+  <div class="ideas" id="ideasBox"></div>
+</div>
+
+<div class="card">
+  <label>Formato</label>
+  <div class="fmt" id="fmt">
+    <div class="opt on" data-f="reels" onclick="pickFmt(this)">Reels<small>9:16 · com música</small></div>
+    <div class="opt" data-f="carrossel" onclick="pickFmt(this)">Carrossel<small>4:5 · vários slides</small></div>
+    <div class="opt" data-f="unica" onclick="pickFmt(this)">Foto única<small>4:5 · um post</small></div>
+  </div>
+  <div id="caropts" class="hidden" style="margin-top:12px">
+    <label>Quantos slides no carrossel?</label>
+    <select id="nslides"><option>5</option><option>6</option><option>7</option><option>8</option></select>
+  </div>
+  <div style="height:14px"></div>
+  <button onclick="gerar()" id="genBtn">✍️ Gerar conteúdo</button>
+  <div class="status" id="status"></div>
+</div>
+
+<div class="preview" id="preview"></div>
+
+<script>
+const OR="#ff4d1c", BG="#0d0d0f", INK="#eeeef2", SOFT="#9698a2", DIM="#6b6d78", WHITE="#f5f5f8", CORAL="#ff785c", DARKONOR="#12100c";
+let fmt="reels", lastSlides=null;
+
+// ---------- settings ----------
+function saveSetts(){localStorage.setItem('ev_key',apiKey.value.trim());localStorage.setItem('ev_model',(model.value.trim()||'claude-sonnet-5'));setStatus('Configuração salva.');document.getElementById('setts').classList.add('hidden');}
+(function(){apiKey.value=localStorage.getItem('ev_key')||'';model.value=localStorage.getItem('ev_model')||'claude-sonnet-5';})();
+function getKey(){const k=localStorage.getItem('ev_key')||apiKey.value.trim();if(!k){document.getElementById('setts').classList.remove('hidden');throw new Error('Configure sua chave da API primeiro.');}return k;}
+function getModel(){return localStorage.getItem('ev_model')||model.value.trim()||'claude-sonnet-5';}
+function setStatus(t,err){const s=document.getElementById('status');s.textContent=t||'';s.className='status'+(err?' err':'');}
+
+// ---------- format ----------
+function pickFmt(el){document.querySelectorAll('#fmt .opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');fmt=el.dataset.f;document.getElementById('caropts').classList.toggle('hidden',fmt!=='carrossel');}
+
+// ---------- mic (Web Speech) ----------
+let rec=null,recing=false;
+function toggleMic(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){setStatus('Teu navegador não suporta ditado. Use o Chrome.',true);return;}
+  if(recing){rec.stop();return;}
+  rec=new SR();rec.lang='pt-BR';rec.continuous=true;rec.interimResults=true;
+  let base=document.getElementById('idea').value;
+  rec.onstart=()=>{recing=true;document.getElementById('micBtn').classList.add('rec');setStatus('Ouvindo... fala a tua ideia.');};
+  rec.onerror=e=>{setStatus('Erro no microfone: '+e.error,true);};
+  rec.onend=()=>{recing=false;document.getElementById('micBtn').classList.remove('rec');setStatus('');};
+  rec.onresult=e=>{let t='';for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;document.getElementById('idea').value=(base?base+' ':'')+t;};
+  rec.start();
+}
+
+// ---------- Claude API ----------
+async function claude(messages, useSearch, maxtok){
+  const body={model:getModel(),max_tokens:maxtok||3000,messages};
+  if(useSearch) body.tools=[{type:"web_search_20250305",name:"web_search",max_uses:4}];
+  const r=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"content-type":"application/json","x-api-key":getKey(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify(body)
+  });
+  if(!r.ok){const t=await r.text();throw new Error("API "+r.status+": "+t.slice(0,200));}
+  const data=await r.json();
+  return (data.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("\n").trim();
+}
+function parseJSON(t){let s=t.replace(/```json/gi,'').replace(/```/g,'').trim();const a=s.indexOf('{'),b=s.lastIndexOf('}');const c=s.indexOf('['),d=s.lastIndexOf(']');if(c>-1&&(c<a||a===-1))return JSON.parse(s.slice(c,d+1));return JSON.parse(s.slice(a,b+1));}
+
+const PERSONA=`Você é a estrategista de conteúdo da Karina Leite (@kaalineleite), da Efeito Vendas, consultoria de Shopee e marketplaces no Brasil. Público: sellers e empreendedores de e-commerce.
+TOM: direto, professora que cansou de ver bobagem, provocador do jeito certo. Ironia seca, nunca deboche gratuito.
+REGRAS INEGOCIÁVEIS:
+- O vilão é SEMPRE a desinformação ou o erro do seller. NUNCA critique a Shopee ou qualquer marketplace.
+- Nunca invente resultado de cliente ou aluno.
+- Números realistas (ex: CPM na Shopee fica entre R$1 e R$3; margem saudável acima de 25%).
+- Sem travessão (—), use vírgula. Sem emoji nos textos das artes.
+- Toda provocação precisa ter conteúdo real sustentando (conta, regra, número). Nada de polêmica vazia.
+- Linguagem brasileira de e-commerce. O que salva no perfil dela é CONTA que desmonta uma ILUSÃO.`;
+
+// ---------- IDEAS ----------
+async function trazerIdeias(){
+  try{
+    setStatus('Pesquisando o que está acontecendo...');document.getElementById('ideasBtn').disabled=true;
+    const msg=[{role:"user",content:`${PERSONA}
+
+Pesquise na web novidades e assuntos QUENTES das últimas semanas sobre Shopee, marketplaces, e-commerce e tráfego pago no Brasil (mudanças de regra, taxas, ferramentas, tendências). 
+Depois me traga 6 ideias de post POLÊMICAS e úteis, no estilo dela (conta que desmonta ilusão, verdade incômoda).
+Responda APENAS um array JSON, sem texto fora: [{"titulo":"frase curta e provocativa","angulo":"1 linha do que o post defende"}]`}];
+    const out=await claude(msg,true,2500);
+    const ideas=parseJSON(out);
+    const box=document.getElementById('ideasBox');box.innerHTML='';
+    ideas.forEach(it=>{const d=document.createElement('div');d.className='idea';d.innerHTML=`<b>${it.titulo}</b><br>${it.angulo||''}`;d.onclick=()=>{document.getElementById('idea').value=it.titulo+'. '+(it.angulo||'');};box.appendChild(d);});
+    setStatus('Toca numa ideia pra usar, ou escreve a tua.');
+  }catch(e){setStatus(e.message,true);}finally{document.getElementById('ideasBtn').disabled=false;}
+}
+
+// ---------- GENERATE ----------
+const SCHEMA=`Cada slide tem "blocks", uma lista ordenada. Tipos de bloco:
+{"type":"kicker","text":"SEÇÃO · AULA 1"}
+{"type":"title","lines":["linha 1","linha 2"],"highlight":1}   // highlight = índice da linha que recebe marca-texto laranja (ou -1)
+{"type":"paragraph","runs":[{"t":"texto normal "},{"t":"negrito","b":true},{"t":"laranja","o":true}]}
+{"type":"formula","text":"CPM = gasto ÷ (impressões ÷ 1.000)"}
+{"type":"rows","items":[{"k":"Investi","v":"R$ 30","kind":"neutral"},{"k":"− Custo","v":"R$ 20","kind":"minus"},{"k":"Preço","v":"R$ 50","kind":"plus"}]}
+{"type":"bigcalc","expr":"CPM = 30 ÷ 15","value":"= R$ 2,00"}   // value fica circulado em laranja
+{"type":"note","runs":[{"t":"a leitura: "},{"t":"isso é o que importa","o":true}]}
+{"type":"cta","text":"Salva e faz a tua conta."}`;
+
+async function gerar(){
+  try{
+    const idea=document.getElementById('idea').value.trim();
+    if(!idea){setStatus('Escreve ou fala a ideia primeiro.',true);return;}
+    document.getElementById('genBtn').disabled=true;setStatus('Escrevendo o conteúdo...');
+    let regras='';
+    if(fmt==='carrossel'){const n=document.getElementById('nslides').value;regras=`Formato CARROSSEL com EXATAMENTE ${n} slides. Slide 1 = capa (kicker + title forte + 1 paragraph curto de gancho). Slides do meio = um conceito/conta por slide, cada um se explicando sozinho. Último slide = CTA (title + paragraph + cta). Cada slide com poucos blocks (cabe em 4:5).`;}
+    else if(fmt==='reels'){regras=`Formato REELS (1 imagem vertical 9:16). UM único slide, denso: kicker, title (2 linhas, highlight na 2ª), 2-3 paragraphs explicando ANTES da conta, depois formula/rows/bigcalc com o número principal, um note e um cta. Ordem: explica primeiro, conta depois.`;}
+    else{regras=`Formato FOTO ÚNICA (1 imagem 4:5). UM slide enxuto: kicker, title, 1-2 paragraphs, a conta (rows ou bigcalc), note curto e cta. Menos texto que o reels.`;}
+    const msg=[{role:"user",content:`${PERSONA}
+
+TEMA DO POST: "${idea}"
+
+${regras}
+
+ESQUEMA DE SAÍDA (desenhado como caderno preto e laranja):
+${SCHEMA}
+
+Regras de conteúdo: explique o conceito ANTES de mostrar a conta. Use uma conta/número realista pra provar o ponto. Destaque a palavra-chave com "o":true. O título deve ser curto e provocativo, com marca-texto na parte principal.
+Responda APENAS com JSON válido: {"slides":[{"blocks":[...]}]}. Sem texto fora do JSON.`}];
+    const out=await claude(msg,false,4000);
+    const data=parseJSON(out);
+    lastSlides=data.slides;
+    renderAll(data.slides);
+    setStatus('Pronto. Toca em baixar em cada imagem.');
+  }catch(e){setStatus(e.message,true);}finally{document.getElementById('genBtn').disabled=false;}
+}
+
+// ================= RENDERER (canvas, estilo nota3) =================
+function dims(){if(fmt==='reels')return[1080,1920];return[1080,1350];}
+function renderAll(slides){
+  const box=document.getElementById('preview');box.innerHTML='';
+  const wrap=document.createElement('div');wrap.className='slides';box.appendChild(wrap);
+  slides.forEach((s,i)=>{
+    const [W,Hh]=dims();
+    const cv=document.createElement('canvas');cv.width=W;cv.height=Hh;
+    drawSlide(cv,s,i+1,slides.length);
+    const w=document.createElement('div');w.className='slidewrap';
+    w.appendChild(cv);
+    const b=document.createElement('button');b.className='dl';b.textContent='baixar '+(i+1);
+    b.onclick=()=>{const a=document.createElement('a');a.download=`efeito-${fmt}-${i+1}.png`;a.href=cv.toDataURL('image/png');a.click();};
+    w.appendChild(b);wrap.appendChild(w);
+  });
+}
+function jitterEllipse(ctx,cx,cy,rx,ry,color){
+  ctx.strokeStyle=color;ctx.lineWidth=6;ctx.lineJoin='round';ctx.beginPath();
+  const n=60,st=Math.random()*.6;
+  for(let i=0;i<=n+5;i++){const a=st+i/n*2*Math.PI;const x=cx+(rx+(Math.random()*6-3))*Math.cos(a);const y=cy+(ry+(Math.random()*6-3))*Math.sin(a);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+  ctx.stroke();
+}
+function jitterLine(ctx,x1,y1,x2,y2,color,w){
+  ctx.strokeStyle=color;ctx.lineWidth=w||3;ctx.beginPath();
+  const seg=18,n=Math.max(2,Math.hypot(x2-x1,y2-y1)/seg);
+  for(let i=0;i<=n;i++){const t=i/n;let x=x1+(x2-x1)*t,y=y1+(y2-y1)*t;if(i>0&&i<n){x+=Math.random()*3-1.5;y+=Math.random()*3-1.5;}i?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+  ctx.stroke();
+}
+function fontFor(kind,size){ // kind: hand,handB,ui,uiB
+  if(kind==='hand')return `400 ${size}px Kalam`;
+  if(kind==='handB')return `700 ${size}px Kalam`;
+  if(kind==='ui')return `500 ${size}px Poppins`;
+  return `600 ${size}px Poppins`;
+}
+// mede/desenha um paragrafo com runs; retorna nova y
+function paragraph(ctx,x,y,runs,size,lh,maxw,draw){
+  const words=[];runs.forEach(r=>{(r.t||'').split(' ').forEach(w=>{if(w)words.push({w,b:r.b,o:r.o});});});
+  let line=[],lines=[];
+  const wlen=arr=>{let s=0;arr.forEach(o=>{ctx.font=fontFor(o.b?'handB':'hand',size);s+=ctx.measureText(o.w+' ').width;});return s;};
+  words.forEach(o=>{if(wlen(line.concat(o))<=maxw||!line.length)line.push(o);else{lines.push(line);line=[o];}});
+  if(line.length)lines.push(line);
+  lines.forEach(ln=>{let xx=x;ln.forEach(o=>{ctx.font=fontFor(o.b?'handB':'hand',size);ctx.fillStyle=o.o?OR:INK;if(draw)ctx.fillText(o.w,xx,y);xx+=ctx.measureText(o.w+' ').width;});y+=lh;});
+  return y;
+}
+// desenha slide (2 passes: mede e escala pra caber)
+function drawSlide(cv,slide,idx,total){
+  const ctx=cv.getContext('2d');const W=cv.width,Hh=cv.height,M=100;
+  // fundo
+  ctx.fillStyle=BG;ctx.fillRect(0,0,W,Hh);
+  ctx.strokeStyle='rgba(255,255,255,.03)';ctx.lineWidth=1;
+  for(let gx=160;gx<W;gx+=160){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,Hh);ctx.stroke();}
+  for(let gy=160;gy<Hh;gy+=160){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
+  // header
+  ctx.textBaseline='top';ctx.font=fontFor('uiB',29);ctx.fillStyle=INK;ctx.fillText('@kaalineleite',M,72);
+  ctx.font=fontFor('ui',19);ctx.fillStyle=DIM;const rt='EFEITO VENDAS';const rw=ctx.measureText(rt).width;ctx.fillText(rt,W-M-rw,80);
+  // separa cta
+  let ctaText=null;const blocks=[];slide.blocks.forEach(b=>{if(b.type==='cta')ctaText=b.text;else blocks.push(b);});
+  const ctaY=Hh-108, startY=170, avail=ctaY-startY-30;
+  // measure pass
+  const measured=flow(ctx,blocks,M,startY,W,1,false);
+  const scale=Math.min(1,avail/(measured-startY));
+  // draw pass
+  flow(ctx,blocks,M,startY,W,scale,true);
+  // cta
+  if(ctaText){ctx.font=fontFor('uiB',32);ctx.fillStyle=OR;ctx.fillText(ctaText,M,ctaY+30);}
+  // contador carrossel
+  if(total>1){ctx.font=fontFor('ui',22);ctx.fillStyle=DIM;const c=idx+'/'+total;ctx.fillText(c,W-M-ctx.measureText(c).width,ctaY+34);}
+}
+function flow(ctx,blocks,M,startY,W,sc,draw){
+  let y=startY;const maxw=W-2*M;const S=n=>n*sc;
+  blocks.forEach(b=>{
+    if(b.type==='kicker'){
+      if(draw){ctx.fillStyle=OR;ctx.fillRect(M,y+2,26,24*sc);ctx.font=fontFor('uiB',S(22));ctx.fillStyle=SOFT;let xx=M+42;const t=(b.text||'').toUpperCase();for(const ch of t){ctx.fillText(ch,xx,y);xx+=ctx.measureText(ch).width+3;}}
+      y+=S(40);
+    }else if(b.type==='title'){
+      const size=S(78);const lh=size*1.02;
+      (b.lines||[]).forEach((ln,i)=>{
+        ctx.font=fontFor('handB',size);
+        if(b.highlight===i){
+          const w=ctx.measureText(ln).width;const dy=(Math.random()*8-4);const pad=14;
+          if(draw){ctx.fillStyle=OR;ctx.beginPath();ctx.moveTo(M-pad,y+14*sc+dy);ctx.lineTo(M+w+pad+4,y+8*sc-dy);ctx.lineTo(M+w+pad,y+size+10*sc+dy);ctx.lineTo(M-pad-4,y+size+4*sc-dy);ctx.closePath();ctx.fill();ctx.fillStyle=DARKONOR;ctx.fillText(ln,M,y);}
+        }else if(draw){ctx.fillStyle=INK;ctx.fillText(ln,M,y);}
+        y+=lh;
+      });
+      y+=S(26);
+    }else if(b.type==='paragraph'){
+      y=paragraph(ctx,M,y,b.runs||[],S(50),S(62),maxw,draw);y+=S(6);
+    }else if(b.type==='formula'){
+      const size=S(46);ctx.font=fontFor('handB',size);if(draw){ctx.fillStyle=WHITE;ctx.fillText(b.text||'',M,y);}y+=size*1.1;
+      if(draw)jitterLine(ctx,M,y+6,W-M,y+6,DIM,2);y+=S(34);
+    }else if(b.type==='rows'){
+      const size=S(50);(b.items||[]).forEach(it=>{
+        ctx.font=fontFor('hand',size);if(draw){ctx.fillStyle=SOFT;ctx.fillText(it.k||'',M+10,y);}
+        ctx.font=fontFor('handB',size);const col=it.kind==='minus'?CORAL:(it.kind==='plus'?WHITE:WHITE);const vw=ctx.measureText(it.v||'').width;if(draw){ctx.fillStyle=col;ctx.fillText(it.v||'',W-M-vw,y);}
+        y+=size*1.28;
+      });y+=S(10);
+    }else if(b.type==='bigcalc'){
+      const s1=S(66);ctx.font=fontFor('handB',s1);if(draw){ctx.fillStyle=INK;ctx.fillText(b.expr||'',M+10,y);}y+=s1*1.05;
+      const s2=S(80);ctx.font=fontFor('handB',s2);const vw=ctx.measureText(b.value||'').width;if(draw){ctx.fillStyle=OR;ctx.fillText(b.value||'',M+10,y);jitterEllipse(ctx,M+10+vw/2,y+s2/2,vw/2+38*sc,58*sc,OR);}y+=s2+S(60);
+    }else if(b.type==='note'){
+      y=paragraph(ctx,M+10,y,b.note?[{t:b.note}]:(b.runs||[]),S(46),S(56),maxw-10,draw);y+=S(30);
+    }
+  });
+  return y;
+}
+document.fonts.ready.then(()=>{});
+</script>
+</body>
+</html>
