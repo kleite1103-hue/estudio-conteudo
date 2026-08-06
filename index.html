@@ -49,6 +49,7 @@ button.mic.rec{background:#e0342f;color:#fff;animation:pulse 1s infinite}
 .hint{font-size:11px;color:var(--dim);margin-top:6px;line-height:1.4}
 a{color:var(--orange)}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <h1>Estúdio de Conteúdo <b>Efeito Vendas</b></h1>
@@ -84,6 +85,12 @@ a{color:var(--orange)}
     <div class="opt" data-f="carrossel" onclick="pickFmt(this)">Carrossel<small>4:5 · vários slides</small></div>
     <div class="opt" data-f="unica" onclick="pickFmt(this)">Foto única<small>4:5 · um post</small></div>
   </div>
+  <div style="height:14px"></div>
+  <label>Cor de fundo</label>
+  <div class="fmt" id="tema">
+    <div class="opt on" data-t="preto" onclick="pickTema(this)">Preto<small>escuro · laranja</small></div>
+    <div class="opt" data-t="bege" onclick="pickTema(this)">Bege<small>caderno · laranja</small></div>
+  </div>
   <div id="caropts" class="hidden" style="margin-top:12px">
     <label>Quantos slides no carrossel?</label>
     <select id="nslides"><option>5</option><option>6</option><option>7</option><option>8</option></select>
@@ -93,11 +100,24 @@ a{color:var(--orange)}
   <div class="status" id="status"></div>
 </div>
 
+<div class="card hidden" id="legcard">
+  <label>Legenda (toca pra copiar)</label>
+  <textarea id="legenda" readonly onclick="copyLeg()" style="min-height:150px"></textarea>
+  <div style="height:10px"></div>
+  <button class="ghost" onclick="baixarPDF()">📄 Baixar mini-PDF (isca pra quem comentar)</button>
+  <div class="hint">O PDF é a desculpa pra puxar comentário. Manda pra quem comentar a palavra-chave.</div>
+</div>
 <div class="preview" id="preview"></div>
 
 <script>
-const OR="#ff4d1c", BG="#0d0d0f", INK="#eeeef2", SOFT="#9698a2", DIM="#6b6d78", WHITE="#f5f5f8", CORAL="#ff785c", DARKONOR="#12100c";
-let fmt="reels", lastSlides=null;
+const OR="#ff4d1c";
+const THEMES={
+  preto:{BG:"#0d0d0f",INK:"#eeeef2",SOFT:"#9698a2",DIM:"#6b6d78",WHITE:"#f5f5f8",CORAL:"#ff785c",GRID:"rgba(255,255,255,.03)",CTABG:"#1a120e"},
+  bege: {BG:"#f5f2ea",INK:"#26241c",SOFT:"#78766c",DIM:"#a8a496",WHITE:"#1a1812",CORAL:"#d0472e",GRID:"rgba(0,0,0,.04)",CTABG:"#efe4d6"}
+};
+function TH(){return THEMES[tema];}
+let fmt="reels", tema="preto", lastSlides=null, lastLegenda='';
+function pickTema(el){document.querySelectorAll('#tema .opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');tema=el.dataset.t;if(lastSlides)renderAll(lastSlides);}
 
 // ---------- settings ----------
 function saveSetts(){localStorage.setItem('ev_key',apiKey.value.trim());localStorage.setItem('ev_model',(model.value.trim()||'claude-sonnet-5'));setStatus('Configuração salva.');document.getElementById('setts').classList.add('hidden');}
@@ -197,12 +217,17 @@ ESQUEMA DE SAÍDA (desenhado como caderno preto e laranja):
 ${SCHEMA}
 
 Regras de conteúdo: explique o conceito ANTES de mostrar a conta. Use uma conta/número realista pra provar o ponto. Destaque a palavra-chave com "o":true. O título deve ser curto e provocativo, com marca-texto na parte principal.
-Responda APENAS com JSON válido: {"slides":[{"blocks":[...]}]}. Sem texto fora do JSON.`}];
+Além dos slides, gere:
+- "legenda": a legenda pronta pra postar (gancho na 1a linha, corpo explicando, e terminando com "Comenta [PALAVRA] que eu te mando o guia"). Pode usar no maximo 2 emojis. Termine com exatamente 3 hashtags.
+- "palavra": a palavra-chave do comentario (ex: CPM).
+- "pdf": objeto {"titulo":"...", "pontos":["frase 1","frase 2","frase 3","frase 4"], "fecho":"1 frase puxando pra consultoria/mentoria"} para um mini-material de 1 pagina.
+Responda APENAS com JSON válido: {"slides":[{"blocks":[...]}],"legenda":"...","palavra":"...","pdf":{...}}. Sem texto fora do JSON.`}];
     const out=await claude(msg,false,4000);
     const data=parseJSON(out);
-    lastSlides=data.slides;
+    lastSlides=data.slides; window.lastData=data;
     renderAll(data.slides);
-    setStatus('Pronto. Toca em baixar em cada imagem.');
+    showLegenda(data.legenda||'');
+    setStatus('Pronto! Imagem, legenda e mini-PDF logo abaixo.');
   }catch(e){setStatus(e.message,true);}finally{document.getElementById('genBtn').disabled=false;}
 }
 
@@ -222,6 +247,7 @@ function renderAll(slides){
     w.appendChild(b);wrap.appendChild(w);
   });
 }
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();ctx.fill();}
 function jitterEllipse(ctx,cx,cy,rx,ry,color){
   ctx.strokeStyle=color;ctx.lineWidth=6;ctx.lineJoin='round';ctx.beginPath();
   const n=60,st=Math.random()*.6;
@@ -247,20 +273,20 @@ function paragraph(ctx,x,y,runs,size,lh,maxw,draw){
   const wlen=arr=>{let s=0;arr.forEach(o=>{ctx.font=fontFor(o.b?'handB':'hand',size);s+=ctx.measureText(o.w+' ').width;});return s;};
   words.forEach(o=>{if(wlen(line.concat(o))<=maxw||!line.length)line.push(o);else{lines.push(line);line=[o];}});
   if(line.length)lines.push(line);
-  lines.forEach(ln=>{let xx=x;ln.forEach(o=>{ctx.font=fontFor(o.b?'handB':'hand',size);ctx.fillStyle=o.o?OR:INK;if(draw)ctx.fillText(o.w,xx,y);xx+=ctx.measureText(o.w+' ').width;});y+=lh;});
+  lines.forEach(ln=>{let xx=x;ln.forEach(o=>{ctx.font=fontFor(o.b?'handB':'hand',size);ctx.fillStyle=o.o?OR:TH().INK;if(draw)ctx.fillText(o.w,xx,y);xx+=ctx.measureText(o.w+' ').width;});y+=lh;});
   return y;
 }
 // desenha slide (2 passes: mede e escala pra caber)
 function drawSlide(cv,slide,idx,total){
   const ctx=cv.getContext('2d');const W=cv.width,Hh=cv.height,M=100;
   // fundo
-  ctx.fillStyle=BG;ctx.fillRect(0,0,W,Hh);
-  ctx.strokeStyle='rgba(255,255,255,.03)';ctx.lineWidth=1;
+  ctx.fillStyle=TH().BG;ctx.fillRect(0,0,W,Hh);
+  ctx.strokeStyle=TH().GRID;ctx.lineWidth=1;
   for(let gx=160;gx<W;gx+=160){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,Hh);ctx.stroke();}
   for(let gy=160;gy<Hh;gy+=160){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
   // header
-  ctx.textBaseline='top';ctx.font=fontFor('uiB',29);ctx.fillStyle=INK;ctx.fillText('@kaalineleite',M,72);
-  ctx.font=fontFor('ui',19);ctx.fillStyle=DIM;const rt='EFEITO VENDAS';const rw=ctx.measureText(rt).width;ctx.fillText(rt,W-M-rw,80);
+  ctx.textBaseline='top';ctx.font=fontFor('uiB',29);ctx.fillStyle=TH().INK;ctx.fillText('@kaalineleite',M,72);
+  ctx.font=fontFor('ui',19);ctx.fillStyle=TH().DIM;const rt='EFEITO VENDAS';const rw=ctx.measureText(rt).width;ctx.fillText(rt,W-M-rw,80);
   // separa cta
   let ctaText=null;const blocks=[];slide.blocks.forEach(b=>{if(b.type==='cta')ctaText=b.text;else blocks.push(b);});
   const ctaY=Hh-108, startY=170, avail=ctaY-startY-30;
@@ -270,15 +296,15 @@ function drawSlide(cv,slide,idx,total){
   // draw pass
   flow(ctx,blocks,M,startY,W,scale,true);
   // cta
-  if(ctaText){ctx.font=fontFor('uiB',32);ctx.fillStyle=OR;ctx.fillText(ctaText,M,ctaY+30);}
+  if(ctaText){const by=ctaY-2;ctx.fillStyle=TH().CTABG;rr(ctx,M,by,W-2*M,84,16);ctx.fillStyle=OR;ctx.fillRect(M,by,8,84);ctx.font=fontFor('uiB',30);ctx.fillStyle=OR;ctx.fillText(ctaText,M+30,by+22);}
   // contador carrossel
-  if(total>1){ctx.font=fontFor('ui',22);ctx.fillStyle=DIM;const c=idx+'/'+total;ctx.fillText(c,W-M-ctx.measureText(c).width,ctaY+34);}
+  if(total>1){ctx.font=fontFor('ui',22);ctx.fillStyle=TH().DIM;const c=idx+'/'+total;ctx.fillText(c,W-M-ctx.measureText(c).width,ctaY+34);}
 }
 function flow(ctx,blocks,M,startY,W,sc,draw){
   let y=startY;const maxw=W-2*M;const S=n=>n*sc;
   blocks.forEach(b=>{
     if(b.type==='kicker'){
-      if(draw){ctx.fillStyle=OR;ctx.fillRect(M,y+2,26,24*sc);ctx.font=fontFor('uiB',S(22));ctx.fillStyle=SOFT;let xx=M+42;const t=(b.text||'').toUpperCase();for(const ch of t){ctx.fillText(ch,xx,y);xx+=ctx.measureText(ch).width+3;}}
+      if(draw){ctx.fillStyle=OR;ctx.fillRect(M,y+2,26,24*sc);ctx.font=fontFor('uiB',S(22));ctx.fillStyle=TH().SOFT;let xx=M+42;const t=(b.text||'').toUpperCase();for(const ch of t){ctx.fillText(ch,xx,y);xx+=ctx.measureText(ch).width+3;}}
       y+=S(40);
     }else if(b.type==='title'){
       const size=S(78);const lh=size*1.02;
@@ -286,30 +312,53 @@ function flow(ctx,blocks,M,startY,W,sc,draw){
         ctx.font=fontFor('handB',size);
         if(b.highlight===i){
           const w=ctx.measureText(ln).width;const dy=(Math.random()*8-4);const pad=14;
-          if(draw){ctx.fillStyle=OR;ctx.beginPath();ctx.moveTo(M-pad,y+14*sc+dy);ctx.lineTo(M+w+pad+4,y+8*sc-dy);ctx.lineTo(M+w+pad,y+size+10*sc+dy);ctx.lineTo(M-pad-4,y+size+4*sc-dy);ctx.closePath();ctx.fill();ctx.fillStyle=DARKONOR;ctx.fillText(ln,M,y);}
-        }else if(draw){ctx.fillStyle=INK;ctx.fillText(ln,M,y);}
+          if(draw){ctx.fillStyle=OR;ctx.beginPath();ctx.moveTo(M-pad,y+14*sc+dy);ctx.lineTo(M+w+pad+4,y+8*sc-dy);ctx.lineTo(M+w+pad,y+size+10*sc+dy);ctx.lineTo(M-pad-4,y+size+4*sc-dy);ctx.closePath();ctx.fill();ctx.fillStyle=(tema==='bege'?'#1a1206':'#12100c');ctx.fillText(ln,M,y);}
+        }else if(draw){ctx.fillStyle=TH().INK;ctx.fillText(ln,M,y);}
         y+=lh;
       });
       y+=S(26);
     }else if(b.type==='paragraph'){
       y=paragraph(ctx,M,y,b.runs||[],S(50),S(62),maxw,draw);y+=S(6);
     }else if(b.type==='formula'){
-      const size=S(46);ctx.font=fontFor('handB',size);if(draw){ctx.fillStyle=WHITE;ctx.fillText(b.text||'',M,y);}y+=size*1.1;
-      if(draw)jitterLine(ctx,M,y+6,W-M,y+6,DIM,2);y+=S(34);
+      const size=S(46);ctx.font=fontFor('handB',size);if(draw){ctx.fillStyle=TH().INK;ctx.fillText(b.text||'',M,y);}y+=size*1.1;
+      if(draw)jitterLine(ctx,M,y+6,W-M,y+6,TH().DIM,2);y+=S(34);
     }else if(b.type==='rows'){
       const size=S(50);(b.items||[]).forEach(it=>{
-        ctx.font=fontFor('hand',size);if(draw){ctx.fillStyle=SOFT;ctx.fillText(it.k||'',M+10,y);}
-        ctx.font=fontFor('handB',size);const col=it.kind==='minus'?CORAL:(it.kind==='plus'?WHITE:WHITE);const vw=ctx.measureText(it.v||'').width;if(draw){ctx.fillStyle=col;ctx.fillText(it.v||'',W-M-vw,y);}
+        ctx.font=fontFor('hand',size);if(draw){ctx.fillStyle=TH().SOFT;ctx.fillText(it.k||'',M+10,y);}
+        ctx.font=fontFor('handB',size);const col=it.kind==='minus'?TH().CORAL:TH().INK;const vw=ctx.measureText(it.v||'').width;if(draw){ctx.fillStyle=col;ctx.fillText(it.v||'',W-M-vw,y);}
         y+=size*1.28;
       });y+=S(10);
     }else if(b.type==='bigcalc'){
-      const s1=S(66);ctx.font=fontFor('handB',s1);if(draw){ctx.fillStyle=INK;ctx.fillText(b.expr||'',M+10,y);}y+=s1*1.05;
+      const s1=S(66);ctx.font=fontFor('handB',s1);if(draw){ctx.fillStyle=TH().INK;ctx.fillText(b.expr||'',M+10,y);}y+=s1*1.05;
       const s2=S(80);ctx.font=fontFor('handB',s2);const vw=ctx.measureText(b.value||'').width;if(draw){ctx.fillStyle=OR;ctx.fillText(b.value||'',M+10,y);jitterEllipse(ctx,M+10+vw/2,y+s2/2,vw/2+38*sc,58*sc,OR);}y+=s2+S(60);
     }else if(b.type==='note'){
       y=paragraph(ctx,M+10,y,b.note?[{t:b.note}]:(b.runs||[]),S(46),S(56),maxw-10,draw);y+=S(30);
     }
   });
   return y;
+}
+function showLegenda(t){const c=document.getElementById('legcard');document.getElementById('legenda').value=t;c.classList.toggle('hidden',!t);}
+function copyLeg(){const el=document.getElementById('legenda');el.select();document.execCommand('copy');setStatus('Legenda copiada.');}
+function baixarPDF(){
+  const p=(window.lastData&&window.lastData.pdf)||null; if(!p){setStatus('Gera um post primeiro.',true);return;}
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'pt',format:'a4'}); const W=595,M=54; let y=90;
+  // faixa laranja topo
+  doc.setFillColor(255,77,28); doc.rect(0,0,W,10,'F');
+  doc.setFont('helvetica','bold'); doc.setTextColor(20,20,24); doc.setFontSize(24);
+  doc.text(doc.splitTextToSize(p.titulo||'Guia',W-2*M),M,y); y+=20;
+  doc.setDrawColor(255,77,28); doc.setLineWidth(3); doc.line(M,y,M+70,y); y+=40;
+  doc.setFontSize(13); doc.setFont('helvetica','normal'); doc.setTextColor(50,50,55);
+  (p.pontos||[]).forEach(pt=>{
+    doc.setFillColor(255,77,28); doc.circle(M+4,y-4,3,'F');
+    const lines=doc.splitTextToSize(pt,W-2*M-20);
+    doc.text(lines,M+18,y); y+=lines.length*20+14;
+  });
+  y+=10; doc.setDrawColor(230,230,225); doc.line(M,y,W-M,y); y+=30;
+  doc.setFont('helvetica','bold'); doc.setTextColor(255,77,28); doc.setFontSize(14);
+  doc.text(doc.splitTextToSize(p.fecho||'Quer ir além? Fala com a Efeito Vendas.',W-2*M),M,y);
+  y+=40; doc.setTextColor(120,120,125); doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text('@kaalineleite  ·  Efeito Vendas',M,800);
+  doc.save('efeito-guia.pdf'); setStatus('Mini-PDF baixado.');
 }
 document.fonts.ready.then(()=>{});
 </script>
