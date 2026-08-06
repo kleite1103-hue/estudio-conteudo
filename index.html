@@ -104,8 +104,11 @@ a{color:var(--orange)}
   <label>Legenda (toca pra copiar)</label>
   <textarea id="legenda" readonly onclick="copyLeg()" style="min-height:150px"></textarea>
   <div style="height:10px"></div>
-  <button class="ghost" onclick="baixarPDF()">📄 Baixar mini-PDF (isca pra quem comentar)</button>
-  <div class="hint">O PDF é a desculpa pra puxar comentário. Manda pra quem comentar a palavra-chave.</div>
+  <div class="row">
+    <button class="ghost" onclick="baixarPDF()">📄 Baixar passo a passo (PDF)</button>
+    <button class="ghost" onclick="copyJson()">🔗 Copiar linha p/ a Central</button>
+  </div>
+  <div class="hint">Fluxo: alguém comenta a palavra → você responde "tá na central: materiais.selleriaclub.com.br". Sobe o PDF na Central e cola a linha do materiais.json. O comentário gera engajamento e o cadastro qualifica o lead no SDR Hub.</div>
 </div>
 <div class="preview" id="preview"></div>
 
@@ -168,7 +171,7 @@ REGRAS INEGOCIÁVEIS:
 - Sem travessão (—), use vírgula. Sem emoji nos textos das artes.
 - Toda provocação precisa ter conteúdo real sustentando (conta, regra, número). Nada de polêmica vazia.
 - Linguagem brasileira de e-commerce. O que salva no perfil dela é CONTA que desmonta uma ILUSÃO.
-- CTA OBRIGATÓRIO: o último bloco SEMPRE é um "cta" que puxa COMENTÁRIO (ela não consegue enviar DM pra todos, então o objetivo é gerar engajamento nos comentários). Formato: "Comenta [PALAVRA-CHAVE] que eu te mando o [material/guia/PDF]". A palavra-chave deve ter relação com o tema (ex: tema CPM -> "Comenta CPM que eu te mando o guia"). Nunca termine sem esse CTA de comentar.`;
+- CTA OBRIGATÓRIO: o último bloco SEMPRE é um "cta" que puxa COMENTÁRIO para gerar engajamento (ela não manda DM pra todos). O material fica na Central de Materiais dela (cadastro que qualifica o lead). Formato do cta na arte: "Comenta [PALAVRA]" (curto). A palavra-chave tem relação com o tema (ex: CPM). Nunca termine sem esse CTA de comentar.`;
 
 // ---------- IDEAS ----------
 async function trazerIdeias(){
@@ -218,10 +221,10 @@ ${SCHEMA}
 
 Regras de conteúdo: explique o conceito ANTES de mostrar a conta. Use uma conta/número realista pra provar o ponto. Destaque a palavra-chave com "o":true. O título deve ser curto e provocativo, com marca-texto na parte principal.
 Além dos slides, gere:
-- "legenda": a legenda pronta pra postar (gancho na 1a linha, corpo explicando, e terminando com "Comenta [PALAVRA] que eu te mando o guia"). Pode usar no maximo 2 emojis. Termine com exatamente 3 hashtags.
+- "legenda": legenda pronta pra postar. Gancho na 1a linha, corpo explicando, e fecho puxando COMENTARIO: "Comenta [PALAVRA] que eu te libero o passo a passo completo na nossa central de materiais". Maximo 2 emojis. Termine com exatamente 3 hashtags.
 - "palavra": a palavra-chave do comentario (ex: CPM).
-- "pdf": objeto {"titulo":"...", "pontos":["frase 1","frase 2","frase 3","frase 4"], "fecho":"1 frase puxando pra consultoria/mentoria"} para um mini-material de 1 pagina.
-Responda APENAS com JSON válido: {"slides":[{"blocks":[...]}],"legenda":"...","palavra":"...","pdf":{...}}. Sem texto fora do JSON.`}];
+- "material": um mini material PASSO A PASSO pra ficar na Central de Materiais. Objeto {"titulo":"...", "subtitulo":"1 linha", "passos":["Passo 1 — instrucao pratica e curta","Passo 2 — ...","Passo 3 — ...","Passo 4 — ..."], "fecho":"1 frase puxando pra consultoria/mentoria Efeito Vendas"}. Os passos sao ACIONAVEIS (a pessoa faz), nao teoria.
+Responda APENAS com JSON válido: {"slides":[{"blocks":[...]}],"legenda":"...","palavra":"...","material":{...}}. Sem texto fora do JSON.`}];
     const out=await claude(msg,false,4000);
     const data=parseJSON(out);
     lastSlides=data.slides; window.lastData=data;
@@ -340,25 +343,38 @@ function flow(ctx,blocks,M,startY,W,sc,draw){
 function showLegenda(t){const c=document.getElementById('legcard');document.getElementById('legenda').value=t;c.classList.toggle('hidden',!t);}
 function copyLeg(){const el=document.getElementById('legenda');el.select();document.execCommand('copy');setStatus('Legenda copiada.');}
 function baixarPDF(){
-  const p=(window.lastData&&window.lastData.pdf)||null; if(!p){setStatus('Gera um post primeiro.',true);return;}
-  const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'pt',format:'a4'}); const W=595,M=54; let y=90;
-  // faixa laranja topo
-  doc.setFillColor(255,77,28); doc.rect(0,0,W,10,'F');
+  const p=(window.lastData&&(window.lastData.material||window.lastData.pdf))||null; if(!p){setStatus('Gera um post primeiro.',true);return;}
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'pt',format:'a4'}); const W=595,Hh=842,M=54; let y=88;
+  doc.setFillColor(255,77,28); doc.rect(0,0,W,12,'F');
   doc.setFont('helvetica','bold'); doc.setTextColor(20,20,24); doc.setFontSize(24);
-  doc.text(doc.splitTextToSize(p.titulo||'Guia',W-2*M),M,y); y+=20;
-  doc.setDrawColor(255,77,28); doc.setLineWidth(3); doc.line(M,y,M+70,y); y+=40;
-  doc.setFontSize(13); doc.setFont('helvetica','normal'); doc.setTextColor(50,50,55);
-  (p.pontos||[]).forEach(pt=>{
-    doc.setFillColor(255,77,28); doc.circle(M+4,y-4,3,'F');
-    const lines=doc.splitTextToSize(pt,W-2*M-20);
-    doc.text(lines,M+18,y); y+=lines.length*20+14;
+  doc.text(doc.splitTextToSize(p.titulo||'Passo a passo',W-2*M),M,y); y+=8;
+  if(p.subtitulo){y+=22;doc.setFont('helvetica','normal');doc.setFontSize(13);doc.setTextColor(110,110,115);doc.text(doc.splitTextToSize(p.subtitulo,W-2*M),M,y);}
+  y+=24; doc.setDrawColor(255,77,28); doc.setLineWidth(3); doc.line(M,y,M+70,y); y+=34;
+  const passos=p.passos||p.pontos||[];
+  passos.forEach((pt,i)=>{
+    doc.setFillColor(255,77,28); doc.circle(M+10,y-4,11,'F');
+    doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255); doc.setFontSize(12);
+    doc.text(String(i+1),M+10,y-0,{align:'center',baseline:'middle'});
+    doc.setFont('helvetica','normal'); doc.setTextColor(45,45,50); doc.setFontSize(13);
+    const lines=doc.splitTextToSize(pt.replace(/^Passo\s*\d+\s*[—:-]\s*/i,''),W-2*M-40);
+    doc.text(lines,M+34,y); y+=lines.length*18+18;
   });
-  y+=10; doc.setDrawColor(230,230,225); doc.line(M,y,W-M,y); y+=30;
+  y+=8; doc.setDrawColor(232,232,227); doc.line(M,y,W-M,y); y+=28;
   doc.setFont('helvetica','bold'); doc.setTextColor(255,77,28); doc.setFontSize(14);
-  doc.text(doc.splitTextToSize(p.fecho||'Quer ir além? Fala com a Efeito Vendas.',W-2*M),M,y);
-  y+=40; doc.setTextColor(120,120,125); doc.setFont('helvetica','normal'); doc.setFontSize(11);
-  doc.text('@kaalineleite  ·  Efeito Vendas',M,800);
-  doc.save('efeito-guia.pdf'); setStatus('Mini-PDF baixado.');
+  doc.text(doc.splitTextToSize(p.fecho||'Quer aplicar isso na sua loja com a gente? Fala com a Efeito Vendas.',W-2*M),M,y);
+  // rodape
+  doc.setDrawColor(255,77,28); doc.setLineWidth(2); doc.line(M,Hh-70,W-M,Hh-70);
+  doc.setFont('helvetica','bold'); doc.setTextColor(30,30,34); doc.setFontSize(12);
+  doc.text('@kaalineleite  ·  EFEITO VENDAS',M,Hh-46);
+  doc.setFont('helvetica','normal'); doc.setTextColor(120,120,125); doc.setFontSize(11);
+  doc.text('Mais materiais em: materiais.selleriaclub.com.br',M,Hh-28);
+  doc.save('efeito-material.pdf'); setStatus('Mini-PDF (passo a passo) baixado.');
+}
+function copyJson(){
+  const p=(window.lastData&&(window.lastData.material))||{}; const pal=(window.lastData&&window.lastData.palavra)||'';
+  const entry={titulo:p.titulo||'Novo material',descricao:p.subtitulo||'',palavra:pal,link:'COLE_AQUI_O_LINK_DO_PDF',novo:true};
+  const t=JSON.stringify(entry,null,2);
+  navigator.clipboard.writeText(t); setStatus('Linha do materiais.json copiada. Cole na Central.');
 }
 document.fonts.ready.then(()=>{});
 </script>
