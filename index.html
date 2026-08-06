@@ -207,9 +207,9 @@ async function gerar(){
     if(!idea){setStatus('Escreve ou fala a ideia primeiro.',true);return;}
     document.getElementById('genBtn').disabled=true;setStatus('Escrevendo o conteúdo...');
     let regras='';
-    if(fmt==='carrossel'){const n=document.getElementById('nslides').value;regras=`Formato CARROSSEL com EXATAMENTE ${n} slides. Slide 1 = capa (kicker + title forte + 1 paragraph curto de gancho). Slides do meio = um conceito/conta por slide, cada um se explicando sozinho. Último slide = CTA (title + paragraph + cta). Cada slide com poucos blocks (cabe em 4:5).`;}
-    else if(fmt==='reels'){regras=`Formato REELS (1 imagem vertical 9:16). UM único slide, denso: kicker, title (2 linhas, highlight na 2ª), 2-3 paragraphs explicando ANTES da conta, depois formula/rows/bigcalc com o número principal, um note e um cta. Ordem: explica primeiro, conta depois.`;}
-    else{regras=`Formato FOTO ÚNICA (1 imagem 4:5). UM slide enxuto: kicker, title, 1-2 paragraphs, a conta (rows ou bigcalc), note curto e cta. Menos texto que o reels.`;}
+    if(fmt==='carrossel'){const n=document.getElementById('nslides').value;regras=`Formato CARROSSEL com EXATAMENTE ${n} slides. Slide 1 = capa (kicker + title forte + 1 frase curta de gancho). Slides do meio = UMA ideia por slide, bem enxuto (1 parágrafo de até 2 linhas + no máximo uma conta). Último slide = CTA. Cada slide RESPIRA, nada de textão.`;}
+    else if(fmt==='reels'){regras=`Formato REELS (9:16), UM slide. SEJA ENXUTA, a arte NÃO pode virar textão. Estrutura: kicker; title 2 linhas curtas (highlight na 2ª); NO MÁXIMO 2 parágrafos de explicação, cada um com NO MÁXIMO 2 linhas (até ~18 palavras cada); depois a conta (rows OU bigcalc) com o número principal; 1 note de 1 linha; cta. Explica antes, conta depois.`;}
+    else{regras=`Formato FOTO ÚNICA (4:5), UM slide. MUITO enxuto: kicker; title; 1 parágrafo de no máximo 2 linhas; a conta (rows ou bigcalc); 1 note de 1 linha; cta.`;}
     const msg=[{role:"user",content:`${PERSONA}
 
 TEMA DO POST: "${idea}"
@@ -219,7 +219,9 @@ ${regras}
 ESQUEMA DE SAÍDA (desenhado como caderno preto e laranja):
 ${SCHEMA}
 
-Regras de conteúdo: explique o conceito ANTES de mostrar a conta. Use uma conta/número realista pra provar o ponto. Destaque a palavra-chave com "o":true. O título deve ser curto e provocativo, com marca-texto na parte principal.
+REGRAS DE TAMANHO (importantes): textos CURTOS e diretos. Cada parágrafo no máximo 2 linhas. Frases de no máximo ~14 palavras. A arte precisa respirar, MENOS É MAIS. Não repita a mesma ideia em dois parágrafos.
+O "cta" (último bloco) é CURTO: só "Comenta [PALAVRA]" (no máximo 3 palavras). O convite completo (com a central) vai só na legenda, nunca na arte.
+Explique o conceito ANTES da conta. Use número realista. Destaque a palavra-chave com "o":true. Título curto e provocativo, marca-texto na parte principal.
 Além dos slides, gere:
 - "legenda": legenda pronta pra postar. Gancho na 1a linha, corpo explicando, e fecho puxando COMENTARIO: "Comenta [PALAVRA] que eu te libero o passo a passo completo na nossa central de materiais". Maximo 2 emojis. Termine com exatamente 3 hashtags.
 - "palavra": a palavra-chave do comentario (ex: CPM).
@@ -236,7 +238,14 @@ Responda APENAS com JSON válido: {"slides":[{"blocks":[...]}],"legenda":"...","
 
 // ================= RENDERER (canvas, estilo nota3) =================
 function dims(){if(fmt==='reels')return[1080,1920];return[1080,1350];}
-function renderAll(slides){
+async function ensureFonts(){
+  try{await Promise.all([
+    document.fonts.load('400 60px Kalam'),document.fonts.load('700 60px Kalam'),
+    document.fonts.load('500 30px Poppins'),document.fonts.load('600 30px Poppins'),document.fonts.load('700 40px Poppins')
+  ]);await document.fonts.ready;}catch(e){}
+}
+async function renderAll(slides){
+  await ensureFonts();
   const box=document.getElementById('preview');box.innerHTML='';
   const wrap=document.createElement('div');wrap.className='slides';box.appendChild(wrap);
   slides.forEach((s,i)=>{
@@ -299,7 +308,9 @@ function drawSlide(cv,slide,idx,total){
   // draw pass
   flow(ctx,blocks,M,startY,W,scale,true);
   // cta
-  if(ctaText){const by=ctaY-2;ctx.fillStyle=TH().CTABG;rr(ctx,M,by,W-2*M,84,16);ctx.fillStyle=OR;ctx.fillRect(M,by,8,84);ctx.font=fontFor('uiB',30);ctx.fillStyle=OR;ctx.fillText(ctaText,M+30,by+22);}
+  if(ctaText){const by=ctaY-2,bw=W-2*M,bh=84;ctx.fillStyle=TH().CTABG;rr(ctx,M,by,bw,bh,16);ctx.fillStyle=OR;ctx.fillRect(M,by,8,bh);
+    let fs=34;ctx.font=fontFor('uiB',fs);while(ctx.measureText(ctaText).width>bw-70&&fs>18){fs--;ctx.font=fontFor('uiB',fs);}
+    ctx.fillStyle=OR;ctx.textBaseline='middle';ctx.fillText(ctaText,M+34,by+bh/2);ctx.textBaseline='top';}
   // contador carrossel
   if(total>1){ctx.font=fontFor('ui',22);ctx.fillStyle=TH().DIM;const c=idx+'/'+total;ctx.fillText(c,W-M-ctx.measureText(c).width,ctaY+34);}
 }
