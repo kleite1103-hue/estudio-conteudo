@@ -152,7 +152,7 @@ TEMA: "${idea}"
 Gere um card vertical (reels) e o roteiro de narração pra ele.
 BLOCOS do card: kicker{text}; title{lines[],highlight}; paragraph{runs[{t,b,o}]}; formula{text}; rows{items[{k,v,kind:plus|minus|neutral}]}; bigcalc{expr,value}; note{runs}; cta{text curto: "Comenta [PALAVRA]"}.
 Enxuto: title 2 linhas (highlight na 2a), no máximo 2 parágrafos curtos, a conta (rows ou bigcalc), 1 note, cta.
-NARRAÇÃO: texto corrido, no tom dela, que ela vai FALAR por cima (2 a 4 frases, ~20 a 30 segundos, natural, começando com um gancho e terminando puxando o comentário). Sem markdown.
+NARRAÇÃO: texto corrido no tom dela, que ela vai FALAR por cima. Escreva pra durar de 12 a 20 segundos falados, com ritmo calmo e explicativo (frases pausadas, sem correria). Comece com um gancho, explique o raciocínio, e termine puxando o comentário. Sem markdown.
 Responda só JSON: {"slide":{"blocks":[...]},"narracao":"...","palavra":"..."}`}];
     const data=parseJSON(await claude(msg,3000));
     log('conteúdo pronto.','ok');
@@ -184,8 +184,8 @@ Responda só JSON: {"slide":{"blocks":[...]},"narracao":"...","palavra":"..."}`}
     function frame(){
       const t=au.currentTime;
       // reveal ate 55% da duracao; circulo entre 60% e 78%
-      const rev=Math.min(1,t/(D*0.55));const revH=Math.floor(80+rev*(1770-80));
-      const cf=Math.max(0,Math.min(1,(t-D*0.60)/(D*0.18)));
+      const rev=Math.min(1,t/(D*0.72));const revH=Math.floor(80+rev*(1770-80));
+      const cf=Math.max(0,Math.min(1,(t-D*0.74)/(D*0.16)));
       ctx.fillStyle=BG;ctx.fillRect(0,0,1080,1920);
       ctx.drawImage(off,0,0,1080,revH,0,0,1080,revH);
       drawCircle(ctx,cf);
