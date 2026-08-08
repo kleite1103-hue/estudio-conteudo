@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estúdio de Vídeo — Efeito Vendas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0d0f;--pan:#16161a;--pan2:#1d1e23;--line:#2a2b31;--orange:#ff4d1c;--ink:#eeeef2;--soft:#9698a2;--dim:#6b6d78}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'Poppins',sans-serif;padding:16px;max-width:760px;margin:0 auto}
+h1{font-size:20px;font-weight:700}h1 b{color:var(--orange)}
+.sub{color:var(--soft);font-size:13px;margin-bottom:16px}
+.card{background:var(--pan);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+label{display:block;font-size:12px;color:var(--soft);margin-bottom:6px;font-weight:500}
+input,textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:11px 13px;color:var(--ink);font-family:'Poppins';font-size:14px}
+input:focus,textarea:focus{outline:none;border-color:var(--orange)}
+textarea{min-height:80px;resize:vertical}
+button{background:var(--orange);color:#12100c;border:none;border-radius:10px;padding:12px 16px;font-family:'Poppins';font-weight:600;font-size:14px;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1}
+.settings-toggle{font-size:12px;color:var(--dim);cursor:pointer;text-decoration:underline;margin-bottom:10px;display:inline-block}
+.hidden{display:none}
+.hint{font-size:11px;color:var(--dim);margin-top:6px;line-height:1.4}
+.log{font-family:monospace;font-size:12px;color:var(--soft);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:12px;max-height:180px;overflow:auto;white-space:pre-wrap}
+.log b{color:var(--orange)}.log .ok{color:#4ade80}.log .er{color:#ff5c5c}
+canvas{width:100%;max-width:280px;border-radius:12px;border:1px solid var(--line);display:block;margin:12px auto}
+video{width:100%;max-width:280px;border-radius:12px;display:block;margin:12px auto}
+a.dlbtn{display:inline-block;background:var(--orange);color:#12100c;text-decoration:none;border-radius:10px;padding:12px 16px;font-weight:600;font-size:14px;text-align:center}
+.warn{background:rgba(255,203,69,.1);border:1px solid rgba(255,203,69,.4);color:#ffcb45;border-radius:10px;padding:12px;font-size:12px;line-height:1.5;margin-bottom:14px}
+</style>
+</head>
+<body>
+<h1>Estúdio de Vídeo <b>Efeito Vendas</b></h1>
+<div class="sub">Card animado + tua voz narrando. Feito pra rodar no computador (Chrome).</div>
+
+<div class="warn">⚠️ Use no <b>computador, no Chrome</b>. Deixa o som do PC ligado durante a geração (o vídeo grava o áudio junto). Não troca de aba enquanto grava.</div>
+
+<span class="settings-toggle" onclick="document.getElementById('setts').classList.toggle('hidden')">⚙ configurar chaves</span>
+<div class="card hidden" id="setts">
+  <label>Chave Anthropic (Claude)</label>
+  <input id="apiKey" type="password" placeholder="sk-ant-...">
+  <div style="height:8px"></div>
+  <label>Modelo Claude</label>
+  <input id="model" placeholder="claude-sonnet-5">
+  <div style="height:8px"></div>
+  <label>Chave ElevenLabs</label>
+  <input id="elKey" type="password" placeholder="sk_...">
+  <div style="height:8px"></div>
+  <label>Voice ID da tua voz (no ElevenLabs)</label>
+  <input id="elVoice" placeholder="ex: 21m00Tcm4TlvDq8ikWAM">
+  <div class="hint">O Voice ID fica em VoiceLab &gt; sua voz &gt; ID. As chaves ficam só no teu navegador.</div>
+  <div style="height:10px"></div>
+  <button class="ghost" onclick="saveSetts()">Salvar</button>
+</div>
+
+<div class="card">
+  <label>Sua ideia</label>
+  <textarea id="idea" placeholder="Ex: como calcular o CPM na Shopee..."></textarea>
+  <div style="height:12px"></div>
+  <button onclick="gerarVideo()" id="genBtn">🎬 Gerar vídeo narrado</button>
+  <div class="log hidden" id="log"></div>
+</div>
+
+<div id="out"></div>
+
+<canvas id="cv" width="1080" height="1920" class="hidden"></canvas>
+<audio id="au" class="hidden"></audio>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const OR="#ff4d1c",BG="#0d0d0f",INK="#eeeef2",SOFT="#9698a2",DIM="#6b6d78",WHITE="#f5f5f8",CORAL="#ff785c",DARKONOR="#12100c";
+function $(id){return document.getElementById(id);}
+function saveSetts(){localStorage.setItem('ev_key',apiKey.value.trim());localStorage.setItem('ev_model',model.value.trim()||'claude-sonnet-5');localStorage.setItem('el_key',elKey.value.trim());localStorage.setItem('el_voice',elVoice.value.trim());log('Config salva.','ok');$('setts').classList.add('hidden');}
+(function(){apiKey.value=localStorage.getItem('ev_key')||'';model.value=localStorage.getItem('ev_model')||'claude-sonnet-5';elKey.value=localStorage.getItem('el_key')||'';elVoice.value=localStorage.getItem('el_voice')||'';})();
+function K_(){const k=localStorage.getItem('ev_key')||apiKey.value.trim();if(!k)throw new Error('Configure a chave do Claude.');return k;}
+function M_(){return localStorage.getItem('ev_model')||model.value.trim()||'claude-sonnet-5';}
+function EK(){const k=localStorage.getItem('el_key')||elKey.value.trim();if(!k)throw new Error('Configure a chave do ElevenLabs.');return k;}
+function EV(){const v=localStorage.getItem('el_voice')||elVoice.value.trim();if(!v)throw new Error('Configure o Voice ID.');return v;}
+function log(t,c){const l=$('log');l.classList.remove('hidden');l.innerHTML+=`<span class="${c||''}">${t}</span>\n`;l.scrollTop=l.scrollHeight;}
+
+// ---------- Claude ----------
+async function claude(messages,maxtok){
+  const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
+    headers:{"content-type":"application/json","x-api-key":K_(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:M_(),max_tokens:maxtok||3000,messages})});
+  if(!r.ok)throw new Error("Claude "+r.status+": "+(await r.text()).slice(0,160));
+  const d=await r.json();return (d.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("\n").trim();
+}
+function parseJSON(t){let s=t.replace(/```json/gi,'').replace(/```/g,'').trim();const a=s.indexOf('{'),b=s.lastIndexOf('}');return JSON.parse(s.slice(a,b+1));}
+const PERSONA=`Você é a estrategista de conteúdo da Karina Leite (@kaalineleite), Efeito Vendas, Shopee/marketplaces BR. Tom direto, provocador do jeito certo. O vilão é sempre a desinformação/erro do seller, NUNCA a Shopee. Número realista. Sem travessão, sem emoji nas artes. Conta que desmonta ilusão.`;
+
+// ---------- ElevenLabs ----------
+async function eleven(text){
+  const r=await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${EV()}?output_format=mp3_44100_128`,{
+    method:"POST",headers:{"xi-api-key":EK(),"content-type":"application/json"},
+    body:JSON.stringify({text,model_id:"eleven_multilingual_v2",voice_settings:{stability:0.5,similarity_boost:0.85,style:0.2}})});
+  if(!r.ok)throw new Error("ElevenLabs "+r.status+": "+(await r.text()).slice(0,160));
+  return await r.blob();
+}
+
+// ================= CARD RENDERER (mesmo estilo nota3) =================
+let CIRCLE=null; // coords do circulo do resultado
+function fontFor(k,s){if(k==='hand')return `400 ${s}px Kalam`;if(k==='handB')return `700 ${s}px Kalam`;if(k==='ui')return `500 ${s}px Poppins`;return `600 ${s}px Poppins`;}
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();ctx.fill();}
+function jline(ctx,x1,y1,x2,y2,col,w){ctx.strokeStyle=col;ctx.lineWidth=w||3;ctx.beginPath();const seg=18,n=Math.max(2,Math.hypot(x2-x1,y2-y1)/seg);for(let i=0;i<=n;i++){const t=i/n;let x=x1+(x2-x1)*t,y=y1+(y2-y1)*t;if(i>0&&i<n){x+=Math.random()*3-1.5;y+=Math.random()*3-1.5;}i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();}
+function para(ctx,x,y,runs,size,lh,maxw){
+  const words=[];runs.forEach(r=>{(r.t||'').split(' ').forEach(w=>{if(w)words.push({w,b:r.b,o:r.o});});});
+  let line=[],lines=[];const wl=a=>{let s=0;a.forEach(o=>{ctx.font=fontFor(o.b?'handB':'hand',size);s+=ctx.measureText(o.w+' ').width;});return s;};
+  words.forEach(o=>{if(wl(line.concat(o))<=maxw||!line.length)line.push(o);else{lines.push(line);line=[o];}});if(line.length)lines.push(line);
+  lines.forEach(ln=>{let xx=x;ln.forEach(o=>{ctx.font=fontFor(o.b?'handB':'hand',size);ctx.fillStyle=o.o?OR:INK;ctx.fillText(o.w,xx,y);xx+=ctx.measureText(o.w+' ').width;});y+=lh;});
+  return y;
+}
+function drawFullCard(ctx,slide){
+  const W=1080,Hh=1920,M=100;CIRCLE=null;
+  ctx.fillStyle=BG;ctx.fillRect(0,0,W,Hh);
+  ctx.strokeStyle='rgba(255,255,255,.03)';ctx.lineWidth=1;
+  for(let gx=160;gx<W;gx+=160){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,Hh);ctx.stroke();}
+  for(let gy=160;gy<Hh;gy+=160){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
+  ctx.textBaseline='top';ctx.font=fontFor('uiB',29);ctx.fillStyle=INK;ctx.fillText('@kaalineleite',M,72);
+  ctx.font=fontFor('ui',19);ctx.fillStyle=DIM;const rt='EFEITO VENDAS';ctx.fillText(rt,W-M-ctx.measureText(rt).width,80);
+  let ctaText=null;const blocks=[];slide.blocks.forEach(b=>{if(b.type==='cta')ctaText=b.text;else blocks.push(b);});
+  let y=170;const maxw=W-2*M;
+  blocks.forEach(b=>{
+    if(b.type==='kicker'){ctx.fillStyle=OR;ctx.fillRect(M,y+2,26,24);ctx.font=fontFor('uiB',22);ctx.fillStyle=SOFT;let xx=M+42;for(const ch of (b.text||'').toUpperCase()){ctx.fillText(ch,xx,y);xx+=ctx.measureText(ch).width+3;}y+=40;}
+    else if(b.type==='title'){const size=78,lh=size*1.02;(b.lines||[]).forEach((ln,i)=>{ctx.font=fontFor('handB',size);if(b.highlight===i){const w=ctx.measureText(ln).width,pad=14;ctx.fillStyle=OR;ctx.beginPath();ctx.moveTo(M-pad,y+14);ctx.lineTo(M+w+pad+4,y+8);ctx.lineTo(M+w+pad,y+size+10);ctx.lineTo(M-pad-4,y+size+4);ctx.closePath();ctx.fill();ctx.fillStyle=DARKONOR;ctx.fillText(ln,M,y);}else{ctx.fillStyle=INK;ctx.fillText(ln,M,y);}y+=lh;});y+=26;}
+    else if(b.type==='paragraph'){y=para(ctx,M,y,b.runs||[],50,62,maxw)+6;}
+    else if(b.type==='formula'){ctx.font=fontFor('handB',46);ctx.fillStyle=WHITE;ctx.fillText(b.text||'',M,y);y+=46*1.1;jline(ctx,M,y+6,W-M,y+6,DIM,2);y+=34;}
+    else if(b.type==='rows'){(b.items||[]).forEach(it=>{ctx.font=fontFor('hand',50);ctx.fillStyle=SOFT;ctx.fillText(it.k||'',M+10,y);ctx.font=fontFor('handB',50);ctx.fillStyle=it.kind==='minus'?CORAL:INK;const vw=ctx.measureText(it.v||'').width;ctx.fillText(it.v||'',W-M-vw,y);y+=50*1.28;});y+=10;}
+    else if(b.type==='bigcalc'){ctx.font=fontFor('handB',66);ctx.fillStyle=INK;ctx.fillText(b.expr||'',M+10,y);y+=66*1.05;ctx.font=fontFor('handB',80);const vw=ctx.measureText(b.value||'').width;ctx.fillStyle=OR;ctx.fillText(b.value||'',M+10,y);CIRCLE={cx:M+10+vw/2,cy:y+40,rx:vw/2+38,ry:58};y+=80+60;}
+    else if(b.type==='note'){y=para(ctx,M+10,y,b.runs||[],46,56,maxw-10)+30;}
+  });
+  // CTA
+  if(ctaText){const by=1770,bw=W-2*M,bh=96;ctx.fillStyle='#1a120e';rr(ctx,M,by,bw,bh,16);ctx.fillStyle=OR;ctx.fillRect(M,by,8,bh);let fs=34;ctx.font=fontFor('uiB',fs);while(ctx.measureText(ctaText).width>bw-70&&fs>18){fs--;ctx.font=fontFor('uiB',fs);}ctx.fillStyle=OR;ctx.textBaseline='middle';ctx.fillText(ctaText,M+34,by+bh/2);ctx.textBaseline='top';}
+}
+function drawCircle(ctx,frac){if(!CIRCLE)return;const {cx,cy,rx,ry}=CIRCLE;ctx.strokeStyle=OR;ctx.lineWidth=6;ctx.lineJoin='round';ctx.beginPath();const n=60,tot=Math.floor(n*frac);let seed=1;const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280;};for(let i=0;i<=tot;i++){const a=i/n*2*Math.PI;const x=cx+(rx+(rnd()*6-3))*Math.cos(a);const y=cy+(ry+(rnd()*6-3))*Math.sin(a);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}if(tot>0)ctx.stroke();}
+
+async function ensureFonts(){try{await Promise.all([document.fonts.load('400 60px Kalam'),document.fonts.load('700 60px Kalam'),document.fonts.load('600 40px Poppins'),document.fonts.load('700 40px Poppins')]);await document.fonts.ready;}catch(e){}}
+
+// ================= PIPELINE =================
+async function gerarVideo(){
+  try{
+    $('log').innerHTML='';$('out').innerHTML='';$('genBtn').disabled=true;
+    const idea=$('idea').value.trim();if(!idea)throw new Error('Escreve a ideia.');
+    await ensureFonts();
+    // 1) Claude: card + narracao
+    log('<b>1/5</b> Escrevendo conteúdo e roteiro...');
+    const msg=[{role:"user",content:`${PERSONA}
+TEMA: "${idea}"
+Gere um card vertical (reels) e o roteiro de narração pra ele.
+BLOCOS do card: kicker{text}; title{lines[],highlight}; paragraph{runs[{t,b,o}]}; formula{text}; rows{items[{k,v,kind:plus|minus|neutral}]}; bigcalc{expr,value}; note{runs}; cta{text curto: "Comenta [PALAVRA]"}.
+Enxuto: title 2 linhas (highlight na 2a), no máximo 2 parágrafos curtos, a conta (rows ou bigcalc), 1 note, cta.
+NARRAÇÃO: texto corrido, no tom dela, que ela vai FALAR por cima (2 a 4 frases, ~20 a 30 segundos, natural, começando com um gancho e terminando puxando o comentário). Sem markdown.
+Responda só JSON: {"slide":{"blocks":[...]},"narracao":"...","palavra":"..."}`}];
+    const data=parseJSON(await claude(msg,3000));
+    log('conteúdo pronto.','ok');
+    // desenha card no canvas offscreen (full, com circulo coords guardadas)
+    const cv=$('cv');const ctx=cv.getContext('2d');
+    const off=document.createElement('canvas');off.width=1080;off.height=1920;const octx=off.getContext('2d');
+    drawFullCard(octx,data.slide); // off = card completo COM tudo menos o circulo (circulo desenhado a parte)
+    // 2) ElevenLabs
+    log('<b>2/5</b> Gerando narração na tua voz...');
+    const mp3=await eleven(data.narracao);
+    const au=$('au');au.src=URL.createObjectURL(mp3);
+    await new Promise(r=>{au.onloadedmetadata=r;au.load();});
+    const D=au.duration||20;log('áudio pronto ('+D.toFixed(1)+'s).','ok');
+    // 3) montar stream canvas + audio
+    log('<b>3/5</b> Preparando gravação...');
+    const actx=new (window.AudioContext||window.webkitAudioContext)();
+    const srcNode=actx.createMediaElementSource(au);
+    const dest=actx.createMediaStreamDestination();
+    srcNode.connect(dest);srcNode.connect(actx.destination);
+    const vstream=cv.captureStream(30);
+    const mixed=new MediaStream([...vstream.getVideoTracks(),...dest.stream.getAudioTracks()]);
+    let mime='video/mp4;codecs=avc1';if(!MediaRecorder.isTypeSupported(mime))mime='video/webm;codecs=vp9,opus';if(!MediaRecorder.isTypeSupported(mime))mime='video/webm';
+    const rec=new MediaRecorder(mixed,{mimeType:mime,videoBitsPerSecond:6000000});
+    const chunks=[];rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+    const done=new Promise(res=>{rec.onstop=res;});
+    // 4) animar sincronizado ao audio
+    log('<b>4/5</b> Gravando (deixa tocar até o fim, não troca de aba)...');
+    rec.start();await actx.resume();au.currentTime=0;await au.play();
+    function frame(){
+      const t=au.currentTime;
+      // reveal ate 55% da duracao; circulo entre 60% e 78%
+      const rev=Math.min(1,t/(D*0.55));const revH=Math.floor(80+rev*(1770-80));
+      const cf=Math.max(0,Math.min(1,(t-D*0.60)/(D*0.18)));
+      ctx.fillStyle=BG;ctx.fillRect(0,0,1080,1920);
+      ctx.drawImage(off,0,0,1080,revH,0,0,1080,revH);
+      drawCircle(ctx,cf);
+      if(!au.paused&&!au.ended)requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+    au.onended=()=>{setTimeout(()=>rec.stop(),400);};
+    await done;
+    log('<b>5/5</b> Finalizando arquivo...');
+    const blob=new Blob(chunks,{type:mime.includes('mp4')?'video/mp4':'video/webm'});
+    const ext=mime.includes('mp4')?'mp4':'webm';
+    const url=URL.createObjectURL(blob);
+    $('out').innerHTML=`<div class="card"><video src="${url}" controls playsinline></video>
+      <a class="dlbtn" download="efeito-video.${ext}" href="${url}">⬇ Baixar vídeo (.${ext})</a>
+      <a class="dlbtn" style="background:transparent;border:1px solid var(--line);color:var(--ink)" download="narracao.mp3" href="${au.src}">⬇ Baixar só o áudio</a>
+      <div class="hint">Legenda: comenta a palavra <b>${data.palavra||''}</b> pra puxar comentário. ${ext==='webm'?'Seu Chrome gravou em WEBM; se o Instagram recusar, converte pra MP4 no CapCut (é rápido).':'MP4 pronto pro Instagram.'}</div></div>`;
+    log('pronto! 🎬','ok');
+  }catch(e){log('ERRO: '+e.message,'er');}
+  finally{$('genBtn').disabled=false;}
+}
+</script>
+</body>
+</html>
